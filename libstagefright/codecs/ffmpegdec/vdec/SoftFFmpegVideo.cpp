@@ -24,6 +24,8 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 
+#include "SoftFFmpegAudio.h"
+
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
 
@@ -93,6 +95,8 @@ SoftFFmpegVideo::SoftFFmpegVideo(
       mWidth(320),
       mHeight(240),
       mStride(320),
+      mLastFrameDelay(0),
+      mLastPTS(0),
       mOutputPortSettingsChange(NONE) {
 
     ALOGD("SoftFFmpegVideo component: %s mMode: %d appData: %p", name, mMode, appData);
@@ -232,10 +236,10 @@ void SoftFFmpegVideo::initPorts() {
 }
 
 void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec) {
-    int fast = 0;
+    int fast = 1;
 
     avctx->workaround_bugs   = 1;
-    avctx->lowres            = 0;
+    avctx->lowres            = 1;
     if(avctx->lowres > codec->max_lowres){
         ALOGW("The maximum value for lowres supported by the decoder is %d",
                 codec->max_lowres);
@@ -244,7 +248,7 @@ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->idct_algo         = 0;
     avctx->skip_frame        = AVDISCARD_DEFAULT;
     avctx->skip_idct         = AVDISCARD_DEFAULT;
-    avctx->skip_loop_filter  = AVDISCARD_DEFAULT;
+    avctx->skip_loop_filter  = AVDISCARD_ALL;
     avctx->error_concealment = 3;
 
     if(avctx->lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
@@ -1028,7 +1032,13 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
         }
 
         inInfo   = *inQueue.begin();
+        if (inInfo == NULL) {
+            continue;
+        }
         inHeader = inInfo->mHeader;
+        if (inHeader == NULL) {
+            continue;
+        }
 
         if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
             ALOGD("ffmpeg video decoder empty eos inbuf");
