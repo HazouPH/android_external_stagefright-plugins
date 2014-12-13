@@ -90,7 +90,6 @@ SoftFFmpegVideo::SoftFFmpegVideo(
       mExtradataReady(false),
       mIgnoreExtradata(false),
       mSignalledError(false),
-      mDoDeinterlace(true),
       mWidth(320),
       mHeight(240),
       mStride(320),
@@ -787,7 +786,7 @@ int32_t SoftFFmpegVideo::openDecoder() {
     ALOGD("open ffmpeg video decoder(%s) success",
             avcodec_get_name(mCtx->codec_id));
 
-    mFrame = avcodec_alloc_frame();
+    mFrame = av_frame_alloc();
     if (!mFrame) {
         ALOGE("oom for video frame");
         return ERR_OOM;
@@ -838,8 +837,7 @@ int32_t SoftFFmpegVideo::decodeVideo() {
 
     AVPacket pkt;
     initPacket(&pkt, inHeader);
-    //av_frame_unref(mFrame); //Don't unref mFrame!!!
-    avcodec_get_frame_defaults(mFrame);
+    av_frame_unref(mFrame);
 
     int err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
     if (err < 0) {
@@ -874,61 +872,14 @@ int32_t SoftFFmpegVideo::decodeVideo() {
 	return ret;
 }
 
-int32_t SoftFFmpegVideo::preProcessVideoFrame(AVPicture *picture, void **bufp) {
-    AVPicture *picture2;
-    AVPicture picture_tmp;
-    uint8_t *buf = NULL;
-
-    //deinterlace : must be done before any resize
-    if (mDoDeinterlace) {
-        int size = 0;
-
-        //create temporary picture
-        size = avpicture_get_size(mCtx->pix_fmt, mCtx->width, mCtx->height);
-        buf  = (uint8_t *)av_malloc(size);
-        if (!buf) {
-            ALOGE("oom for temporary picture");
-            return ERR_OOM;
-        }
-
-        picture2 = &picture_tmp;
-        avpicture_fill(picture2, buf, mCtx->pix_fmt, mCtx->width, mCtx->height);
-
-        if (avpicture_deinterlace(picture2, picture,
-                mCtx->pix_fmt, mCtx->width, mCtx->height) < 0) {
-            //if error, do not deinterlace
-            ALOGE("Deinterlacing failed");
-            av_free(buf);
-            buf = NULL;
-            picture2 = picture;
-        }
-    } else {
-        picture2 = picture;
-    }
-
-    if (picture != picture2)
-        *picture = *picture2;
-    *bufp = buf;
-
-    return ERR_OK;
-}
-
 int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
     BufferInfo *outInfo = *outQueue.begin();
 	OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
     AVPicture pict;
-    void *buffer_to_free = NULL;
     int64_t pts = AV_NOPTS_VALUE;
     uint8_t *dst = outHeader->pBuffer;
-
-    //do deinterlace if necessary. for example, your TV is progressive
-    int32_t err = preProcessVideoFrame((AVPicture *)mFrame, &buffer_to_free);
-    if (err != ERR_OK) {
-        ALOGE("preProcessVideoFrame failed");
-        return err;
-    }
 
     memset(&pict, 0, sizeof(AVPicture));
     pict.data[0] = dst;
@@ -944,7 +895,6 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
            PIX_FMT_YUV420P, sws_flags, NULL, NULL, NULL);
     if (mImgConvertCtx == NULL) {
         ALOGE("Cannot initialize the conversion context");
-        av_free(buffer_to_free);
         return ERR_SWS_FAILED;
     }
     sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
@@ -973,14 +923,13 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     outHeader->nTimeStamp = pts; //FIXME pts is right???
 
 #if DEBUG_FRM
-    ALOGV("mFrame pts: %lld", pts);
+    ALOGV("mFrame pkt_pts: %lld pkt_dts: %lld used %lld", mFrame->pkt_pts, mFrame->pkt_dts, pts);
+
 #endif
 
     outQueue.erase(outQueue.begin());
     outInfo->mOwnedByUs = false;
     notifyFillBufferDone(outHeader);
-
-    av_free(buffer_to_free);
 
     return ERR_OK;
 }
@@ -1048,7 +997,7 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
     }
 }
 
-void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex) {
+void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
     BufferInfo *inInfo = NULL;
     OMX_BUFFERHEADERTYPE *inHeader = NULL;
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);

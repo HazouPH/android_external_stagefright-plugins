@@ -64,12 +64,12 @@ namespace android {
 extern "C" {
 #endif
 
-void exit_program(int ret)
+void exit_program(int ret __unused)
 {
     // do nothing
 }
 
-void show_help_default(const char *opt, const char *arg)
+void show_help_default(const char *opt __unused, const char *arg __unused)
 {
     // do nothing
 }
@@ -231,7 +231,7 @@ status_t initFFmpeg()
 
         /* register all codecs, demux and protocols */
         avcodec_register_all();
-#if CONFIG_AVDEVICE
+#if 0
         avdevice_register_all();
 #endif
         av_register_all();
@@ -273,7 +273,7 @@ void deInitFFmpeg()
 // parser
 //////////////////////////////////////////////////////////////////////////////////
 /* H.264 bitstream with start codes, NOT AVC1! */
-static int h264_split(AVCodecContext *avctx,
+static int h264_split(AVCodecContext *avctx __unused,
 		const uint8_t *buf, int buf_size, int check_compatible_only)
 {
     int i;
@@ -309,8 +309,8 @@ static int h264_split(AVCodecContext *avctx,
     return 0;
 }
 
-static int mpegvideo_split(AVCodecContext *avctx,
-		const uint8_t *buf, int buf_size, int check_compatible_only)
+static int mpegvideo_split(AVCodecContext *avctx __unused,
+		const uint8_t *buf, int buf_size, int check_compatible_only __unused)
 {
     int i;
     uint32_t state= -1;
