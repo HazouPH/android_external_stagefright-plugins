@@ -232,6 +232,8 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->skip_loop_filter  = AVDISCARD_DEFAULT;
     avctx->error_concealment = 3;
 
+    avctx->flags |= CODEC_FLAG_BITEXACT;
+
     if(avctx->lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
     if (fast)   avctx->flags2 |= CODEC_FLAG2_FAST;
     if(codec->capabilities & CODEC_CAP_DR1)
@@ -386,7 +388,13 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->ePCMMode = OMX_AUDIO_PCMModeLinear;
             profile->nBitPerSample = mAudioTgtFmt == AV_SAMPLE_FMT_S32 ? 24 : 16;
 
-            if (getOMXChannelMapping(mAudioSrcChannels, profile->eChannelMapping) != OK) {
+            if (isConfigured()) {
+                profile->nBitPerSample = av_get_bytes_per_sample(mAudioTgtFmt) > 2 ? 24 : 16;
+            } else {
+                profile->nBitPerSample = mHighResAudioEnabled ? 24 : 16;
+            }
+
+            if (getOMXChannelMapping(mAudioTgtChannels, profile->eChannelMapping) != OK) {
                 return OMX_ErrorNone;
             }
 
@@ -771,19 +779,20 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            enum AVSampleFormat targetFmt = AV_SAMPLE_FMT_S16;
-            if (mHighResAudioEnabled && profile->nBitPerSample > 16) {
-                targetFmt = AV_SAMPLE_FMT_S32;
+            if (mHighResAudioEnabled &&
+                    (profile->nBitPerSample > 16 || profile->nBitPerSample == 0)) {
+                mAudioTgtFmt = AV_SAMPLE_FMT_S32;
+            } else {
+                mAudioTgtFmt = AV_SAMPLE_FMT_S16;
             }
             mAudioTgtFreq = profile->nSamplingRate;
             mAudioTgtChannels = profile->nChannels;
-            mAudioTgtFmt = targetFmt;
 
             if (!isConfigured()) {
                 mCtx->channels = profile->nChannels;
                 mCtx->sample_rate = profile->nSamplingRate;
             } else {
-                if (targetFmt != mAudioTgtFmt || profile->nSamplingRate != mAudioTgtFreq ||
+                if (profile->nSamplingRate != mAudioTgtFreq ||
                         profile->nChannels != mAudioTgtChannels) {
                     mOutputReconfigured = true;
                 }
