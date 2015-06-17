@@ -24,8 +24,6 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 
-#include "SoftFFmpegAudio.h"
-
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
 
@@ -809,6 +807,7 @@ void SoftFFmpegVideo::initPacket(AVPacket *pkt,
         pkt->data = (uint8_t *)inHeader->pBuffer + inHeader->nOffset;
         pkt->size = inHeader->nFilledLen;
         pkt->pts = inHeader->nTimeStamp;
+        pkt->dts = inHeader->nTimeStamp;
     } else {
         pkt->data = NULL;
         pkt->size = 0;
@@ -916,8 +915,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
 
     //process timestamps
     if (decoder_reorder_pts == -1) {
-        pts = *(int64_t*)av_opt_ptr(avcodec_get_frame_class(),
-                mFrame, "best_effort_timestamp");
+        pts = av_frame_get_best_effort_timestamp(mFrame);
     } else if (decoder_reorder_pts) {
         pts = mFrame->pkt_pts;
     } else {
