@@ -143,10 +143,10 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
 
 FFmpegExtractor::~FFmpegExtractor() {
     ALOGV("FFmpegExtractor::~FFmpegExtractor");
-    Mutex::Autolock autoLock(mLock);
     // stop reader here if no track!
     stopReaderThread();
 
+    Mutex::Autolock autoLock(mLock);
     deInitStreams();
 }
 
@@ -1049,8 +1049,11 @@ status_t FFmpegExtractor::startReaderThread() {
 void FFmpegExtractor::stopReaderThread() {
     ALOGV("Stopping reader thread");
 
+    mLock.lock();
+
     if (!mReaderThreadStarted) {
         ALOGD("Reader thread have been stopped");
+        mLock.unlock();
         return;
     }
 
@@ -1063,7 +1066,9 @@ void FFmpegExtractor::stopReaderThread() {
     if (mVideoStreamIdx >= 0)
         stream_component_close(mVideoStreamIdx);
 
+    mLock.unlock();
     pthread_join(mReaderThread, NULL);
+    mLock.lock();
 
     if (mFormatCtx) {
         avformat_close_input(&mFormatCtx);
@@ -1071,6 +1076,8 @@ void FFmpegExtractor::stopReaderThread() {
 
     mReaderThreadStarted = false;
     ALOGD("Reader thread stopped");
+
+    mLock.unlock();
 }
 
 // static
