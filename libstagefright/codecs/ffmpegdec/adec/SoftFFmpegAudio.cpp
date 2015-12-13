@@ -185,7 +185,8 @@ void SoftFFmpegAudio::initPorts() {
     } else if (mMode == MODE_DTS) {
         def.nBufferSize = 1000000; // dts!
     } else {
-        def.nBufferSize = 20480; // 8192 is too small
+        // max aggregated buffer size from nuplayer
+        def.nBufferSize = 32 * 1024;
     }
     def.bEnabled = OMX_TRUE;
     def.bPopulated = OMX_FALSE;
