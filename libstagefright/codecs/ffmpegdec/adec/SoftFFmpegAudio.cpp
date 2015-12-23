@@ -1281,7 +1281,7 @@ int32_t SoftFFmpegAudio::decodeAudio() {
     int gotFrm = false;
 	int32_t ret = ERR_OK;
     int32_t inputBufferUsedLength = 0;
-	bool is_flush = (mEOSStatus != INPUT_DATA_AVAILABLE);
+    bool is_flush = (mEOSStatus == OUTPUT_FRAMES_FLUSHED);
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     BufferInfo *inInfo = NULL;
     OMX_BUFFERHEADERTYPE *inHeader = NULL;
@@ -1290,13 +1290,18 @@ int32_t SoftFFmpegAudio::decodeAudio() {
 
     if (!is_flush) {
         inInfo = *inQueue.begin();
-        CHECK(inInfo != NULL);
-        inHeader = inInfo->mHeader;
-
-	if (mInputBufferSize == 0) {
-	    updateTimeStamp(inHeader);
-            mInputBufferSize = inHeader->nFilledLen;
+        if (inInfo != NULL)  {
+            inHeader = inInfo->mHeader;
+            if (mInputBufferSize == 0) {
+                updateTimeStamp(inHeader);
+                mInputBufferSize = inHeader->nFilledLen;
+            }
         }
+    }
+
+    if (mEOSStatus == INPUT_EOS_SEEN && (!inHeader || inHeader->nFilledLen == 0)
+        && !(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
+        return ERR_FLUSHED;
     }
 
     AVPacket pkt;
@@ -1544,12 +1549,6 @@ void SoftFFmpegAudio::drainAllOutputBuffers() {
         return;
     }
 
-    if(!(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
-        drainEOSOutputBuffer();
-        mEOSStatus = OUTPUT_FRAMES_FLUSHED;
-        return;
-    }
-
     while (!outQueue.empty()) {
         if (mResampledDataSize == 0) {
             int32_t err = decodeAudio();
@@ -1598,10 +1597,7 @@ void SoftFFmpegAudio::onQueueFilled(OMX_U32 /* portIndex */) {
         inHeader = inInfo->mHeader;
 
         if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
-            ALOGD("ffmpeg audio decoder empty eos inbuf");
-            inQueue.erase(inQueue.begin());
-            inInfo->mOwnedByUs = false;
-            notifyEmptyBufferDone(inHeader);
+            ALOGD("ffmpeg audio decoder eos");
             mEOSStatus = INPUT_EOS_SEEN;
             continue;
         }
