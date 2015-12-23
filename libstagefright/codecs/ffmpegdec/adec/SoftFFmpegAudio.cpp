@@ -356,6 +356,7 @@ void SoftFFmpegAudio::deInitDecoder() {
 
         if (mCodecAlreadyOpened) {
             mCtx = NULL;
+            mCodecAlreadyOpened = false;
         }
         avcodec_close(mCtx);
         av_free(mCtx);
