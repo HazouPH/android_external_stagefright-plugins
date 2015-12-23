@@ -915,6 +915,7 @@ int FFmpegExtractor::initStreams()
     st_index[AVMEDIA_TYPE_VIDEO]  = -1;
     wanted_stream[AVMEDIA_TYPE_AUDIO]  = -1;
     wanted_stream[AVMEDIA_TYPE_VIDEO]  = -1;
+    AVDictionary *format_opts = NULL, *codec_opts = NULL;
     const char *mime = NULL;
 
     setFFmpegDefaultOpts();
@@ -947,8 +948,11 @@ int FFmpegExtractor::initStreams()
         ALOGE("Option %s not found.\n", t->key);
         //ret = AVERROR_OPTION_NOT_FOUND;
         ret = -1;
+        av_dict_free(&format_opts);
         goto fail;
     }
+
+    av_dict_free(&format_opts);
 
     if (mGenPTS)
         mFormatCtx->flags |= AVFMT_FLAG_GENPTS;
@@ -1899,29 +1903,30 @@ static const char *findMatchingContainer(const char *name)
 
 static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fastMPEG4)
 {
-	int err = 0;
-	size_t i = 0;
-	size_t nb_streams = 0;
-	const char *container = NULL;
-	AVFormatContext *ic = NULL;
-	AVDictionary **opts = NULL;
+    int err = 0;
+    size_t i = 0;
+    size_t nb_streams = 0;
+    const char *container = NULL;
+    AVFormatContext *ic = NULL;
+    AVDictionary *codec_opts = NULL;
+    AVDictionary **opts = NULL;
 
-	status_t status = initFFmpeg();
-	if (status != OK) {
-		ALOGE("could not init ffmpeg");
-		return NULL;
-	}
+    status_t status = initFFmpeg();
+    if (status != OK) {
+        ALOGE("could not init ffmpeg");
+        return NULL;
+    }
 
-	ic = avformat_alloc_context();
-	if (!ic)
-	{
-		ALOGE("oom for alloc avformat context");
-		goto fail;
-	}
+    ic = avformat_alloc_context();
+    if (!ic)
+    {
+        ALOGE("oom for alloc avformat context");
+        goto fail;
+    }
 
-	err = avformat_open_input(&ic, url, NULL, NULL);
+    err = avformat_open_input(&ic, url, NULL, NULL);
 
-	if (err < 0) {
+    if (err < 0) {
         ALOGE("%s: avformat_open_input failed, err:%s", url, av_err2str(err));
 		goto fail;
 	}
