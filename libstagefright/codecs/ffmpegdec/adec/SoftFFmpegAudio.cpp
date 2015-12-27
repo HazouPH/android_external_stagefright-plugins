@@ -1645,7 +1645,7 @@ void SoftFFmpegAudio::onQueueFilled(OMX_U32 /* portIndex */) {
 void SoftFFmpegAudio::onPortFlushCompleted(OMX_U32 portIndex) {
     ALOGV("ffmpeg audio decoder flush port(%lu)", portIndex);
     if (portIndex == kInputPortIndex) {
-        if (mCtx) {
+        if (mCtx && avcodec_is_open(mCtx)) {
             //Make sure that the next buffer output does not still
             //depend on fragments from the last one decoded.
             avcodec_flush_buffers(mCtx);
