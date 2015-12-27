@@ -1808,23 +1808,25 @@ static void adjustCodecConfidence(AVFormatContext *ic, float *confidence)
 static void adjustConfidenceIfNeeded(const char *mime,
 		AVFormatContext *ic, float *confidence)
 {
-	//1. check mime
-	if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
-		adjustMPEG4Confidence(ic, confidence);
-	} else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
-		adjustMPEG2TSConfidence(ic, confidence);
-	} else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MATROSKA)) {
-		adjustMKVConfidence(ic, confidence);
-	} else {
-		//todo here
-	}
+    //1. check mime
+    if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
+        adjustMPEG4Confidence(ic, confidence);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
+        adjustMPEG2TSConfidence(ic, confidence);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MATROSKA)) {
+        adjustMKVConfidence(ic, confidence);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_DIVX)) {
+        *confidence = 0.4f;
+    } else {
+        //todo here
+    }
 
-	if (*confidence > 0.08) {
-		return;
-	}
+    if (*confidence > 0.08) {
+        return;
+    }
 
-	//2. check codec
-	adjustCodecConfidence(ic, confidence);
+    //2. check codec
+    adjustCodecConfidence(ic, confidence);
 }
 
 static void adjustContainerIfNeeded(const char **mime, AVFormatContext *ic)
