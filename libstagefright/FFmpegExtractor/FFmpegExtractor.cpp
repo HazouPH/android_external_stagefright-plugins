@@ -1367,6 +1367,7 @@ FFmpegSource::FFmpegSource(
 
             mNal2AnnexB = true;
         }
+
     }
 
     mMediaType = mStream->codec->codec_type;
@@ -1821,10 +1822,6 @@ static void adjustConfidenceIfNeeded(const char *mime,
         //todo here
     }
 
-    if (*confidence > 0.08) {
-        return;
-    }
-
     //2. check codec
     adjustCodecConfidence(ic, confidence);
 }
@@ -2039,61 +2036,68 @@ static const char *LegacySniffFFMPEG(const sp<DataSource> &source,
 bool SniffFFMPEG(
         const sp<DataSource> &source, String8 *mimeType, float *confidence,
         sp<AMessage> *meta) {
-	ALOGV("SniffFFMPEG");
 
-	*meta = new AMessage;
-	*confidence = 0.08f;  // be the last resort, by default
+    float newConfidence = 0.08f;
 
-	const char *container = BetterSniffFFMPEG(source, confidence, *meta);
-	if (!container) {
-		ALOGW("sniff through BetterSniffFFMPEG failed, try LegacySniffFFMPEG");
-		container = LegacySniffFFMPEG(source, confidence, *meta);
-		if (container) {
-			ALOGV("sniff through LegacySniffFFMPEG success");
-		}
-	} else {
-		ALOGV("sniff through BetterSniffFFMPEG success");
-	}
+    ALOGV("SniffFFMPEG (initial confidence: %f)", confidence);
 
-	if (container == NULL) {
-		ALOGD("SniffFFMPEG failed to sniff this source");
-		(*meta)->clear();
-		*meta = NULL;
-		return false;
-	}
+    if (*confidence > 0.8f) {
+        return false;
+    }
 
-	ALOGD("ffmpeg detected media content as '%s' with confidence %.2f",
-			container, *confidence);
+    *meta = new AMessage;
 
-	/* use MPEG4Extractor(not extended extractor) for HTTP source only */
-	if (!strcasecmp(container, MEDIA_MIMETYPE_CONTAINER_MPEG4)
-			&& (source->flags() & DataSource::kIsCachingDataSource)) {
-		ALOGI("support container: %s, but it is caching data source, "
-				"Don't use ffmpegextractor", container);
-		(*meta)->clear();
-		*meta = NULL;
-		return false;
-	}
+    const char *container = BetterSniffFFMPEG(source, &newConfidence, *meta);
+    if (!container) {
+        ALOGW("sniff through BetterSniffFFMPEG failed, try LegacySniffFFMPEG");
+        container = LegacySniffFFMPEG(source, &newConfidence, *meta);
+        if (container) {
+            ALOGV("sniff through LegacySniffFFMPEG success");
+        }
+    } else {
+        ALOGV("sniff through BetterSniffFFMPEG success");
+    }
 
-	mimeType->setTo(container);
+    if (container == NULL) {
+        ALOGD("SniffFFMPEG failed to sniff this source");
+        (*meta)->clear();
+        *meta = NULL;
+        return false;
+    }
 
-	(*meta)->setString("extended-extractor", "extended-extractor");
-	(*meta)->setString("extended-extractor-subtype", "ffmpegextractor");
-	(*meta)->setString("extended-extractor-mime", container);
+    ALOGD("ffmpeg detected media content as '%s' with confidence %.2f",
+            container, newConfidence);
 
-	//debug only
-	char value[PROPERTY_VALUE_MAX];
-	property_get("sys.media.parser.ffmpeg", value, "0");
-	if (atoi(value)) {
-		ALOGD("[debug] use ffmpeg parser");
-		*confidence = 0.88f;
-	}
+    /* use MPEG4Extractor(not extended extractor) for HTTP source only */
+    if (!strcasecmp(container, MEDIA_MIMETYPE_CONTAINER_MPEG4)
+            && (source->flags() & DataSource::kIsCachingDataSource)) {
+        ALOGI("support container: %s, but it is caching data source, "
+                "Don't use ffmpegextractor", container);
+        (*meta)->clear();
+        *meta = NULL;
+        return false;
+    }
 
-	if (*confidence > 0.08f) {
-		(*meta)->setString("extended-extractor-use", "ffmpegextractor");
-	}
+    mimeType->setTo(container);
 
-	return true;
+    (*meta)->setString("extended-extractor", "extended-extractor");
+    (*meta)->setString("extended-extractor-subtype", "ffmpegextractor");
+    (*meta)->setString("extended-extractor-mime", container);
+
+    //debug only
+    char value[PROPERTY_VALUE_MAX];
+    property_get("sys.media.parser.ffmpeg", value, "0");
+    if (atoi(value)) {
+        ALOGD("[debug] use ffmpeg parser");
+        newConfidence = 0.88f;
+    }
+
+    if (newConfidence > *confidence) {
+        (*meta)->setString("extended-extractor-use", "ffmpegextractor");
+        *confidence = newConfidence;
+    }
+
+    return true;
 }
 
 MediaExtractor *CreateFFmpegExtractor(const sp<DataSource> &source, const char *mime, const sp<AMessage> &meta) {
