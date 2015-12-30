@@ -29,7 +29,14 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1
 
-#ifeq ($(TARGET_ARCH),arm)
+# Workaround for inline assembly tricks in FFMPEG which don't play nice with
+# Clang when included from C++
+LOCAL_CLANG_CFLAGS += -DAVUTIL_ARM_INTREADWRITE_H
+
+# Quiet some noise from FFMPEG
+LOCAL_CLANG_CFLAGS += -Wno-unknown-attributes -Wno-deprecated-declarations
+
+#ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
 #	LOCAL_CFLAGS += -fpermissive
 #endif
 
