@@ -1220,7 +1220,8 @@ void FFmpegExtractor::readerEntry() {
         if (ret < 0) {
             mEOF = true;
             eof = true;
-            if (mFormatCtx->pb && mFormatCtx->pb->error) {
+            if (mFormatCtx->pb && mFormatCtx->pb->error &&
+                    mFormatCtx->pb->error != ERROR_END_OF_STREAM) {
                 ALOGE("mFormatCtx->pb->error: %d", mFormatCtx->pb->error);
                 break;
             }
