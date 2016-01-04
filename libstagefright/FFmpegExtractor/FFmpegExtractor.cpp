@@ -115,7 +115,8 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
       mInitCheck(NO_INIT),
       mFFmpegInited(false),
       mFormatCtx(NULL),
-      mReaderThreadStarted(false) {
+      mReaderThreadStarted(false),
+      mParsedMetadata(false) {
     ALOGV("FFmpegExtractor::FFmpegExtractor");
 
     fetchStuffsFromSniffedMeta(meta);
@@ -195,6 +196,11 @@ sp<MetaData> FFmpegExtractor::getMetaData() {
 
     if (mInitCheck != OK) {
         return NULL;
+    }
+
+    if (!mParsedMetadata) {
+        parseMetadataTags(mFormatCtx, mMeta);
+        mParsedMetadata = true;
     }
 
     return mMeta;
