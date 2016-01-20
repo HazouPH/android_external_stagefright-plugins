@@ -892,7 +892,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     int sws_flags = SWS_BICUBIC;
     mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
            mWidth, mHeight, (AVPixelFormat)mFrame->format, mWidth, mHeight,
-           PIX_FMT_YUV420P, sws_flags, NULL, NULL, NULL);
+           AV_PIX_FMT_YUV420P, sws_flags, NULL, NULL, NULL);
     if (mImgConvertCtx == NULL) {
         ALOGE("Cannot initialize the conversion context");
         return ERR_SWS_FAILED;
