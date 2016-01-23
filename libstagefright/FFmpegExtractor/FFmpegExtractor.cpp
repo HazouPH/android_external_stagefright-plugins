@@ -1687,60 +1687,65 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
 	return supported;
 }
 
-static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence)
+static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence, bool isStreaming)
 {
-	AVDictionary *tags = NULL;
-	AVDictionaryEntry *tag = NULL;
-	enum AVCodecID codec_id = AV_CODEC_ID_NONE;
+    AVDictionary *tags = NULL;
+    AVDictionaryEntry *tag = NULL;
+    enum AVCodecID codec_id = AV_CODEC_ID_NONE;
+    bool is_mov = false;
 
-	//1. check codec id
-	codec_id = getCodecId(ic, AVMEDIA_TYPE_VIDEO);
-	if (codec_id != AV_CODEC_ID_NONE
-			&& codec_id != AV_CODEC_ID_HEVC
-			&& codec_id != AV_CODEC_ID_H264
-			&& codec_id != AV_CODEC_ID_MPEG4
-			&& codec_id != AV_CODEC_ID_H263
-			&& codec_id != AV_CODEC_ID_H263P
-			&& codec_id != AV_CODEC_ID_H263I) {
-		//the MEDIA_MIMETYPE_CONTAINER_MPEG4 of confidence is 0.4f
-		ALOGI("[mp4]video codec(%s), confidence should be larger than MPEG4Extractor",
-				avcodec_get_name(codec_id));
-		*confidence = 0.41f;
-	}
+    //1. check codec id
+    codec_id = getCodecId(ic, AVMEDIA_TYPE_VIDEO);
+    if (codec_id != AV_CODEC_ID_NONE
+            && codec_id != AV_CODEC_ID_HEVC
+            && codec_id != AV_CODEC_ID_H264
+            && codec_id != AV_CODEC_ID_MPEG4
+            && codec_id != AV_CODEC_ID_H263
+            && codec_id != AV_CODEC_ID_H263P
+            && codec_id != AV_CODEC_ID_H263I) {
+        //the MEDIA_MIMETYPE_CONTAINER_MPEG4 of confidence is 0.4f
+        ALOGI("[mp4]video codec(%s), confidence should be larger than MPEG4Extractor",
+                avcodec_get_name(codec_id));
+        *confidence = 0.41f;
+    }
 
     codec_id = getCodecId(ic, AVMEDIA_TYPE_AUDIO);
     if (codec_id != AV_CODEC_ID_NONE
             && codec_id != AV_CODEC_ID_MP3
-			&& codec_id != AV_CODEC_ID_AAC
-			&& codec_id != AV_CODEC_ID_AMR_NB
-			&& codec_id != AV_CODEC_ID_AMR_WB) {
-		ALOGI("[mp4]audio codec(%s), confidence should be larger than MPEG4Extractor",
-				avcodec_get_name(codec_id));
-		*confidence = 0.41f;
-	}
+            && codec_id != AV_CODEC_ID_AAC
+            && codec_id != AV_CODEC_ID_AMR_NB
+            && codec_id != AV_CODEC_ID_AMR_WB) {
+        ALOGI("[mp4]audio codec(%s), confidence should be larger than MPEG4Extractor",
+                avcodec_get_name(codec_id));
+        *confidence = 0.41f;
+    }
 
-	//2. check tag
-	tags = ic->metadata;
-	//NOTE: You can use command to show these tags,
-	//e.g. "ffprobe -show_format 2012.mov"
-	tag = av_dict_get(tags, "major_brand", NULL, 0);
-	if (!tag) {
-		return;
-	}
+    //2. check tag
+    tags = ic->metadata;
+    //NOTE: You can use command to show these tags,
+    //e.g. "ffprobe -show_format 2012.mov"
+    tag = av_dict_get(tags, "major_brand", NULL, 0);
+    if (tag) {
+        ALOGV("major_brand tag is:%s", tag->value);
 
-	ALOGV("major_brand tag is:%s", tag->value);
-
-	//when MEDIA_MIMETYPE_CONTAINER_MPEG4
-	//WTF, MPEG4Extractor.cpp can not extractor mov format
-	//NOTE: isCompatibleBrand(MPEG4Extractor.cpp)
-	//  Won't promise that the following file types can be played.
-	//  Just give these file types a chance.
-	//  FOURCC('q', 't', ' ', ' '),  // Apple's QuickTime
-	//So......
-	if (!strcmp(tag->value, "qt  ")) {
-		ALOGI("[mp4]format is mov, confidence should be larger than mpeg4");
-		*confidence = 0.41f;
-	}
+        //when MEDIA_MIMETYPE_CONTAINER_MPEG4
+        //WTF, MPEG4Extractor.cpp can not extractor mov format
+        //NOTE: isCompatibleBrand(MPEG4Extractor.cpp)
+        //  Won't promise that the following file types can be played.
+        //  Just give these file types a chance.
+        //  FOURCC('q', 't', ' ', ' '),  // Apple's QuickTime
+        //So......
+        if (!strcmp(tag->value, "qt  ")) {
+            ALOGI("[mp4]format is mov, confidence should be larger than mpeg4");
+            *confidence = 0.41f;
+            is_mov = true;
+        }
+    }
+    if (isStreaming && !is_mov) {
+        ALOGI("support container: video/mp4, but it is caching data source, "
+                "Don't use ffmpegextractor");
+        *confidence = 0; // MP4 and streaming, use AOSP
+    }
 }
 
 static void adjustMPEG2PSConfidence(AVFormatContext *ic, float *confidence)
@@ -1857,11 +1862,11 @@ static void adjustCodecConfidence(AVFormatContext *ic, float *confidence)
 
 //TODO need more checks
 static void adjustConfidenceIfNeeded(const char *mime,
-		AVFormatContext *ic, float *confidence)
+        AVFormatContext *ic, float *confidence, bool isStreaming)
 {
     //1. check mime
     if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
-        adjustMPEG4Confidence(ic, confidence);
+        adjustMPEG4Confidence(ic, confidence, isStreaming);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
         adjustMPEG2TSConfidence(ic, confidence);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2PS)) {
@@ -2044,7 +2049,9 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
 	container = findMatchingContainer(ic->iformat->name);
     if (container) {
         adjustContainerIfNeeded(&container, ic);
-        adjustConfidenceIfNeeded(container, ic, confidence);
+        adjustConfidenceIfNeeded(container, ic, confidence, isStreaming);
+        if (*confidence == 0)
+            container = NULL;
     }
 
 fail:
@@ -2089,7 +2096,10 @@ static const char *LegacySniffFFMPEG(const sp<DataSource> &source,
 		return NULL;
 	}
 
-	ALOGV("source url:%s", uri.string());
+    if (source->flags() & DataSource::kIsCachingDataSource)
+       return NULL;
+
+    ALOGV("source url:%s", uri.string());
 
 	// pass the addr of smart pointer("source") + file name
 	snprintf(url, sizeof(url), "android-source:%p|file:%s", source.get(), uri.string());
@@ -2141,16 +2151,6 @@ bool SniffFFMPEG(
 
     ALOGD("ffmpeg detected media content as '%s' with confidence %.2f",
             container, newConfidence);
-
-    /* use MPEG4Extractor(not extended extractor) for HTTP source only */
-    if (!strcasecmp(container, MEDIA_MIMETYPE_CONTAINER_MPEG4)
-            && (source->flags() & DataSource::kIsCachingDataSource)) {
-        ALOGI("support container: %s, but it is caching data source, "
-                "Don't use ffmpegextractor", container);
-        (*meta)->clear();
-        *meta = NULL;
-        return false;
-    }
 
     mimeType->setTo(container);
 
