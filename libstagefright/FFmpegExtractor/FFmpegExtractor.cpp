@@ -2148,6 +2148,9 @@ bool SniffFFMPEG(
     // This is a heavyweight sniffer, don't invoke it if Stagefright knows
     // what it is doing already.
     if (mimeType != NULL && confidence != NULL) {
+        if (*mimeType == "application/ogg") {
+            return false;
+        }
         if (*confidence > 0.8f) {
             return false;
         }
