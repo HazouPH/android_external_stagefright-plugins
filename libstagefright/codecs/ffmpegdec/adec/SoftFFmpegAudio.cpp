@@ -352,13 +352,13 @@ void SoftFFmpegAudio::deInitDecoder() {
         deinitVorbisHdr();
 
         if (mCodecAlreadyOpened) {
-            avcodec_close(mCtx);
-            av_free(mCtx);
             mCtx = NULL;
         }
+        avcodec_close(mCtx);
+        av_free(mCtx);
     }
     if (mFrame) {
-        av_freep(&mFrame);
+        av_frame_free(&mFrame);
         mFrame = NULL;
     }
     if (mSwrCtx) {
@@ -1293,6 +1293,8 @@ int32_t SoftFFmpegAudio::decodeAudio() {
     av_frame_unref(mFrame);
 
     len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, &pkt);
+    av_packet_unref(&pkt);
+
     //a negative error code is returned if an error occurred during decoding
     if (len < 0) {
         ALOGW("ffmpeg audio decoder err, we skip the frame and play silence instead");

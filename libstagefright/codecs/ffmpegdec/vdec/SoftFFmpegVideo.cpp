@@ -342,13 +342,13 @@ void SoftFFmpegVideo::deInitDecoder() {
             mCtx->extradata_size = 0;
         }
         if (mCodecAlreadyOpened) {
-            avcodec_close(mCtx);
-            av_free(mCtx);
             mCtx = NULL;
         }
+        avcodec_close(mCtx);
+        av_free(mCtx);
     }
     if (mFrame) {
-        av_freep(&mFrame);
+        av_frame_free(&mFrame);
         mFrame = NULL;
     }
     if (mImgConvertCtx) {
@@ -845,6 +845,8 @@ int32_t SoftFFmpegVideo::decodeVideo() {
     av_frame_unref(mFrame);
 
     int err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
+    av_packet_unref(&pkt);
+
     if (err < 0) {
         ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);
         //don't send error to OMXCodec, skip!
