@@ -892,17 +892,18 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     BufferInfo *outInfo = *outQueue.begin();
 	OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-    AVPicture pict;
+    uint8_t *data[4];
+    int linesize[4];
+
     int64_t pts = AV_NOPTS_VALUE;
     uint8_t *dst = outHeader->pBuffer;
 
-    memset(&pict, 0, sizeof(AVPicture));
-    pict.data[0] = dst;
-    pict.data[1] = dst + mStride * mHeight;
-    pict.data[2] = pict.data[1] + (mStride / 2  * mHeight / 2);
-    pict.linesize[0] = mStride;
-    pict.linesize[1] = mStride / 2;
-    pict.linesize[2] = mStride / 2;
+    data[0] = dst;
+    data[1] = dst + mStride * mHeight;
+    data[2] = data[1] + (mStride / 2  * mHeight / 2);
+    linesize[0] = mStride;
+    linesize[1] = mStride / 2;
+    linesize[2] = mStride / 2;
 
     int sws_flags = SWS_BICUBIC;
     mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
@@ -913,7 +914,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
         return ERR_SWS_FAILED;
     }
     sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
-            0, mHeight, pict.data, pict.linesize);
+            0, mHeight, data, linesize);
 
     outHeader->nOffset = 0;
     outHeader->nFilledLen = (mStride * mHeight * 3) / 2;
