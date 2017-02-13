@@ -1158,6 +1158,13 @@ void SoftFFmpegVideo::updatePortDefinitions() {
 #endif
 }
 
+void SoftFFmpegVideo::onReset() {
+    ALOGV("onReset()");
+    SimpleSoftOMXComponent::onReset();
+    mSignalledError = false;
+    mExtradataReady = false;
+}
+
 }  // namespace android
 
 android::SoftOMXComponent *createSoftOMXComponent(

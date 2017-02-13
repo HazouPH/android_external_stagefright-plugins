@@ -1698,6 +1698,15 @@ void SoftFFmpegAudio::setAudioClock(int64_t ticks) {
     *sAudioClock = ticks;
 }
 
+void SoftFFmpegAudio::onReset() {
+    enum AVCodecID codecID = mCtx->codec_id;
+    deInitDecoder();
+    initDecoder();
+    mSignalledError = false;
+    mOutputPortSettingsChange = NONE;
+    mEOSStatus = INPUT_DATA_AVAILABLE;
+}
+
 }  // namespace android
 
 android::SoftOMXComponent *createSoftOMXComponent(
