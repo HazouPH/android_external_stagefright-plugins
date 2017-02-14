@@ -1531,10 +1531,10 @@ retry:
     // in OMXCodec.cpp CHECK(lastBufferTimeUs >= 0).
     // And we should not get negative timestamp
     if (timeUs < 0) {
-        ALOGE("negative timestamp encounter: time: %" PRId64
-               " startTimeUs: %" PRId64
-               " packet dts: %" PRId64
-               " packet pts: %" PRId64
+        ALOGE("negative timestamp encounter: time: %lld"
+               " startTimeUs: %lld"
+               " packet dts: %lld"
+               " packet pts: %lld"
                , timeUs, startTimeUs, pkt.dts, pkt.pts);
         mediaBuffer->release();
         mediaBuffer = NULL;
