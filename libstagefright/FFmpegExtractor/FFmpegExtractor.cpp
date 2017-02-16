@@ -1704,6 +1704,7 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
 	//audio
     case AV_CODEC_ID_AAC:
     case AV_CODEC_ID_MP3:
+    case AV_CODEC_ID_ALAC:
     case AV_CODEC_ID_AMR_NB:
     case AV_CODEC_ID_AMR_WB:
     case AV_CODEC_ID_VORBIS:

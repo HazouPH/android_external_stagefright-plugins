@@ -426,7 +426,7 @@ sp<MetaData> setALACFormat(AVCodecContext *avctx)
 
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_ALAC);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta->setData(kKeyAlacMagicCookie, 0, avctx->extradata, avctx->extradata_size);
 
     return meta;
 }
